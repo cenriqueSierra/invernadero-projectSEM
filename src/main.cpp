@@ -6,7 +6,7 @@
 #include <WiFi.h>
 #include <TimeLib.h>  // Librería para el manejo del tiempo
 
-#define DHTPIN 15     // Pin al que está conectado el sensor DHT11
+#define DHTPIN 32     // Pin al que está conectado el sensor DHT11
 #define DHTTYPE DHT11 // Tipo de sensor DHT
 #define COLUMS 16
 #define ROWS   2
@@ -23,13 +23,13 @@ const char* ssid = "Claro_RAMIRES";
 const char* password = "0914709258";
 
 const int sensorPin = 34;  // Pin analógico al que está conectado el sensor
-const int pinBombaA = 13; // De riego. Cambia el número de pin según tu conexión
+const int pinBombaRiego = 13; // De riego. Cambia el número de pin según tu conexión
 const int pinVenti= 12; 
-const int pinBombaB = 14; //De llenado
+const int pinBombaLlenado = 14; //De llenado
 const int pinMotor= 27;
 int trigPin = 22;    // Disparador (Trigger)
 int echoPin = 21;    // Eco (Echo)
-long duration, cm, inches;
+long duration, distanciaUltrasonic, inches;
 
 void setup() {
   // Inicializa el pin del relé como salida
@@ -66,17 +66,17 @@ void setup() {
 
   dht.begin();
   
-
-  pinMode(pinBombaA, OUTPUT);
-  pinMode(pinBombaB, OUTPUT);
+  //pinMode(DHTPIN,INPUT);
+  pinMode(pinBombaRiego, OUTPUT);
+  pinMode(pinBombaLlenado, OUTPUT);
   pinMode(pinVenti, OUTPUT);
   pinMode(pinMotor, OUTPUT);
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
 
   // Apaga el relé al inicio
-  digitalWrite(pinBombaA, LOW);
-  digitalWrite(pinBombaB, LOW);
+  digitalWrite(pinBombaRiego, LOW);
+  digitalWrite(pinBombaLlenado, LOW);
   digitalWrite(pinVenti, LOW);
   digitalWrite(pinMotor, LOW);
 }
@@ -103,12 +103,16 @@ Serial.println();
   //4095 Seco -> 100% antes de pasar a la variable percentageHGround 
   //1600 Mojado ->0% antes de pasar a la variable percentageHGround
   int sensorValue = analogRead(sensorPin);  // Lee el valor analógico del sensor YL-69
-  int percentageHGround = 100 - map(sensorValue, 1600, 4095, 0, 100);  // Mapea el valor a un porcentaje (0-100%)
+  int percentageHGround = map(sensorValue, 1700, 4095, 100, 0);  // Mapea el valor a un porcentaje (0-100%)
   lcd.clear();
   lcd.setCursor(0,0);
 
   float humidity = dht.readHumidity();     // Lee la humedad relativa
   float temperature = dht.readTemperature(); // Lee la temperatura en grados Celsius
+  if (isnan(temperature) || isnan(humidity)) {
+    Serial.println("Error al leer el sensor DHT!");
+    return;
+  }
 
   digitalWrite(trigPin, LOW);
   delayMicroseconds(5);
@@ -162,7 +166,7 @@ if  (condition1Mornig | condition2Morning){ //Al  menos una de las 2 condiciones
 //Noche: 17:31 - 5:59
 int condition1Night = hour >=17 && minutes > 30;
 int condition2Night = hour <6 && minutes <= 59;
-
+/*
 if(condition1Night | condition2Night){
   if (temperature<22.00 && temperature>=18.00){
     digitalWrite(pinVenti, LOW);
@@ -185,9 +189,10 @@ if(condition1Night | condition2Night){
     delay(1000);
     //delay(2000);
   }
-}
+}*/
+//Si la temperatura sube, la humedad baja (Relación inversa)
 //PARA LA HUMEDAD RELATIVA
-if (humidity<=60.00){
+if (humidity<=70.00){
   digitalWrite(pinVenti, HIGH);
   lcd.setCursor(0,0);
   lcd.print("HUM.R BAJA");
@@ -197,7 +202,7 @@ if (humidity<=60.00){
   delay(1000);
 
 }
-else if(humidity>60.00){
+else if(humidity>70.00){
   digitalWrite(pinVenti, LOW);
   lcd.setCursor(0,0);
   lcd.print("HUM.R ALTA");
@@ -208,8 +213,8 @@ else if(humidity>60.00){
 }
 
 //CONDICIONES PARA BOMBA DE RIEGO
-if (percentageHGround>=75){
-  digitalWrite(pinBombaA, LOW);
+if (percentageHGround>50){
+  digitalWrite(pinBombaRiego, LOW);
   lcd.setCursor(0,0);
   lcd.print("HUM.S ALTA");
   delay(1000);
@@ -219,46 +224,14 @@ if (percentageHGround>=75){
 
   //delay(2000);
 }else if(percentageHGround<=50){
-  digitalWrite(pinBombaA, HIGH);
+  digitalWrite(pinBombaRiego, HIGH);
   lcd.setCursor(0,0);
   lcd.print("HUM.S BAJA");
   delay(1000);
   lcd.setCursor(0,1);
   lcd.print("PUMP A ON");
   delay(1000);
-
 }
-
-  /*digitalWrite(pinBombaA, HIGH);
-  delay(2000);
-
-  // Apaga el relé durante 2 segundos
-  digitalWrite(pinBombaA, LOW);
-  delay(2000);
-
-   // Enciende el relé durante 2 segundos
-  digitalWrite(pinBombaB, HIGH);
-  delay(2000);
-
-  // Apaga el relé durante 2 segundos
-  digitalWrite(pinBombaB, LOW);
-  delay(2000);
-
-   // Enciende el relé durante 2 segundos
-  digitalWrite(pinVenti, HIGH);
-  delay(2000);
-
-  // Apaga el relé durante 2 segundos
-  digitalWrite(pinVenti, LOW);
-  delay(2000);
-
-     // Enciende el relé durante 2 segundos
-  digitalWrite(pinMotor, HIGH);
-  delay(2000);
-
-  // Apaga el relé durante 2 segundos
-  digitalWrite(pinMotor, LOW);
-  delay(2000);*/
 
   Serial.print("Valor del sensor: ");
   Serial.println(sensorValue);
@@ -286,28 +259,72 @@ if (percentageHGround>=75){
   lcd.print(percentageHGround);
 
 
-  cm = (duration/2) / 29.1;     // Divide entre 29.1 o multiplica por 0.0343
+  distanciaUltrasonic = (duration/2) / 29.1;     //Entre ultrasonico y nivel de agua  Divide entre 29.1 o multiplica por 0.0343
   inches = (duration/2) / 74;   // Divide entre 74 o multiplica por 0.0135
   
   Serial.print(inches);
   Serial.print("in, ");
-  Serial.print(cm);
-  Serial.print("cm");
+  Serial.print(distanciaUltrasonic);
+  Serial.print("distanciaUltrasonic");
   Serial.println();
   
-  float altura = 50;
-  float resta = altura -cm; //Me da cantidad ocupada de agua 40 
-  
+  float alturaRecipiente = 21;
+  float distanciaSinAgua = alturaRecipiente -distanciaUltrasonic; //Me da cantidad ocupada de agua 40 
+  float porcentajeLibreAgua = (distanciaSinAgua/alturaRecipiente) *100;
+
+  //CONDICIONES DE BOMBAS
+  /**
+  TAnque está al 20% de estar lleno y la riego se activa para el invernadero 
+  /*/
+  if(porcentajeLibreAgua <= 20){
+    digitalWrite(pinBombaLlenado, LOW);
+    lcd.setCursor(0,1);
+    lcd.print("BLLENADO:OFF");
+    delay(1000);
+  }
+
+  //Tanque casi vacío
+  if(porcentajeLibreAgua >= 80){
+    digitalWrite(pinBombaLlenado, HIGH);
+    lcd.setCursor(0,1);
+    lcd.print("BLLENADO:ON");
+    delay(1000);
+  }
+
+  /*
+  * HGround <= 50 debe activarse la bomba de riego
+  */
+  if(porcentajeLibreAgua < 80 && percentageHGround <=50){
+    digitalWrite(pinBombaRiego, HIGH);
+    lcd.setCursor(0,0);
+    lcd.print("BRIEGO:ON");
+    delay(1000);
+  }
+
+  //Condicion para activar bomba de riego
+  /**
+  * El tanque se está vaceando valor de referencia es el 20% de la capacidad máxima
+  * Se apaga la de riego cuando el sensor de suelo es >50
+  */
+  if(porcentajeLibreAgua >= 80 && percentageHGround > 50){
+    digitalWrite(pinBombaRiego, LOW);
+    lcd.setCursor(0,0);
+    lcd.print("BRIEGO:OFF");
+    delay(1000);
+
+    //Notificacion que la bomba de llenado debe encenderse
+
+  }
   /**
   *Condicion par activar bomba de agua 
   */
-  float porcentajeNivelAgua = cm/altura *100; ///es menor o igual a 20% se activa
+  /*float porcentajeNivelAgua = distanciaUltrasonic/alturaRecipiente *100; ///es menor o igual a 20% se activa
   //Debes enviar una notificación 
   if(porcentajeNivelAgua<=20 && percentageHGround <= 50){
-    digitalWrite(pinBombaA,HIGH);
-    digitalWrite(pinBombaB,LOW);
+    digitalWrite(pinBombaRiego,HIGH);
+    digitalWrite(pinBombaLlenado,LOW);
 
-  }
+  }*/
 
 
 
