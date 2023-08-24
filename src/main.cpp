@@ -13,6 +13,12 @@
 #define ROWS   2
 #define PAGE   ((COLUMS) * (ROWS))
 
+#include "BluetoothSerial.h"
+#if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
+#error Bluetooth is not enabled! Please run `make menuconfig` to and enable it
+#endif
+BluetoothSerial SerialBT;
+
 LiquidCrystal_I2C lcd(PCF8574_ADDR_A21_A11_A01, 4, 5, 6, 16, 11, 12, 13, 14, POSITIVE);
 //boolean estado = false;
 /*Funcion para mapear el valor de entrada del sensor de lluvia, u otro sensor*/
@@ -24,10 +30,13 @@ const char* ssid = "Claro_RAMIRES";
 const char* password = "0914709258";
 
 const int sensorPin = 34;  // Pin analógico al que está conectado el sensor
+const int pinVenti1= 12; 
+const int pinVenti2 = 27;
 const int pinBombaRiego = 13; // De riego. Cambia el número de pin según tu conexión
-const int pinVenti= 12; 
 const int pinBombaLlenado = 14; //De llenado
-const int pinMotor= 27;
+//const int NORIEGA = ;
+
+/*Configuracion de sensor ultrasonico*/
 int trigPin = 22;    // Disparador (Trigger)
 int echoPin = 21;    // Eco (Echo)
 long duration, distanciaUltrasonic, inches;
@@ -67,6 +76,11 @@ void setup() {
   // Inicializa el pin del relé como salida
   Serial.begin(115200);
 
+  SerialBT.begin("ESP32test"); //Bluetooth device name
+  Serial.println("The device started, now you can pair it with bluetooth!");
+
+  
+
    // Conéctate a la red WiFi
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
@@ -99,8 +113,10 @@ void setup() {
   //pinMode(DHTPIN,INPUT);
   pinMode(pinBombaRiego, OUTPUT);
   pinMode(pinBombaLlenado, OUTPUT);
-  pinMode(pinVenti, OUTPUT);
-  //pinMode(pinMotor, OUTPUT);
+  pinMode(pinVenti1, OUTPUT);
+  pinMode(pinVenti2, OUTPUT);
+  
+  //pinMode(NORIEGA , OUTPUT);
   
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
@@ -108,15 +124,22 @@ void setup() {
   // Apaga el relé al inicio
   digitalWrite(pinBombaRiego, LOW);
   digitalWrite(pinBombaLlenado, LOW);
-  digitalWrite(pinVenti, LOW);
-  //digitalWrite(pinMotor, LOW);
+  digitalWrite(pinVenti1, LOW);
+  digitalWrite(pinVenti2, LOW);
+  //digitalWrite(NORIEGA , LOW);
 
 }
 
 void loop() {
   int hour;
   int minutes;
-
+  if (Serial.available()) {
+    SerialBT.write(Serial.read());
+  }
+  if (SerialBT.available()) {
+    Serial.write(SerialBT.read());
+  }
+  delay(20);
   // Obtiene y muestra la hora actual
   struct tm timeinfo;
   if(getLocalTime(&timeinfo)){
@@ -179,7 +202,8 @@ void loop() {
 
   if(condition1Mornig | condition2Morning){ //Al  menos una de las 2 condiciones debe cumplirse para ejecutarse.
     if(temperature<23.00 && temperature>=20.00 && humidity>70.00){
-      digitalWrite(pinVenti, LOW);
+      digitalWrite(pinVenti1, LOW);
+      digitalWrite(pinVenti2, LOW);
       lcd.setCursor(0,0);
       lcd.print("Tbaja");
       lcd.print("Halta");
@@ -190,7 +214,8 @@ void loop() {
       //delay(2000);
     }else if(temperature>=23.00 && humidity<=70.00){
     // Apaga el relé durante 2 segundos
-      digitalWrite(pinVenti, HIGH);
+      digitalWrite(pinVenti1, HIGH);
+      digitalWrite(pinVenti2, HIGH);
       lcd.setCursor(0,0);
       lcd.print("Talta,");
       lcd.print("Hbaja");
@@ -208,7 +233,8 @@ void loop() {
   
   if(condition1Night | condition2Night){
     if (temperature<22.00 && temperature>=18.00){
-      digitalWrite(pinVenti, LOW);
+      digitalWrite(pinVenti1, LOW);
+      digitalWrite(pinVenti2, LOW);
       lcd.setCursor(0,0);
       lcd.print("TEMP BAJA");
       delay(tdelay);
@@ -219,7 +245,8 @@ void loop() {
     }
     else if(temperature>=22.00){
     // Apaga el relé durante 2 segundos
-      digitalWrite(pinVenti, HIGH);
+      digitalWrite(pinVenti1, HIGH);
+      digitalWrite(pinVenti2, HIGH);
       lcd.setCursor(0,0);
       lcd.print("TEMP BAJA");
       delay(tdelay);
