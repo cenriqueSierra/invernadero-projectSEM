@@ -5,12 +5,12 @@ The objective is to precisely and efficiently regulate environmental conditions,
 Esp32 microcontroller
 - Due to their features, able to use WiFi/Bluetooth and low energy consumption.
 
-## Technical data and 
+## Technical data and components
 - Sensors
   - Humidity and temperature sensor
   - Soil moisture sensor
   - Ultrasonic Sensor HC-SR04
-  - 
+    
 - Actuators
   - Coolers
   - Water pumps
